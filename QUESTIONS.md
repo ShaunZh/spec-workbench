@@ -109,6 +109,128 @@ API端点     业务逻辑      数据访问       数据库模型
 
 ---
 
-##待补充
+## 技术概念相关
+
+### Q4: BaseModel 是什么？
+
+**日期**: 2026-04-09
+
+**解答**:
+
+`BaseModel` 是 **Pydantic** 库的核心类，用于定义数据模型，提供自动验证和序列化。
+
+**基本作用**:
+```python
+from pydantic import BaseModel
+
+class User(BaseModel):
+    name: str
+    age: int
+    email: str | None = None  # 可选字段
+```
+
+创建实例时，Pydantic 自动：
+1. **类型验证** — 确保数据类型正确
+2. **类型转换** — 尝试将输入转换为指定类型
+3. **错误提示** — 类型不匹配时抛出 ValidationError
+
+**在 FastAPI 中的使用**:
+
+| 场景 | 作用 |
+|------|------|
+| 请求体 | 自动验证客户端提交的 JSON |
+| 响应体 | 自动序列化为 JSON 返回 |
+| OpenAPI 文档 | 自动生成 Swagger 字段定义 |
+
+**BaseModel 核心能力**:
+- `__init__` — 接收数据并验证
+- `.model_dump()` — 转为 Python dict
+- `.model_dump_json()` — 转为 JSON 字符串
+- `Field()` — 字段级别约束（最小值、正则等）
+- `@field_validator` — 自定义验证逻辑
+
+**为什么用 BaseModel 而不是普通类**:
+- 普通类：无验证，任何数据都能传入
+- BaseModel：自动验证，类型不匹配立即报错
+
+---
+
+### Q5: 后端代码的执行流程是怎样的？
+
+**日期**: 2026-04-09
+
+**解答**:
+
+**1. 应用启动流程**:
+
+```
+uvicorn app.main:app --reload
+    ↓
+加载 main.py
+    ↓
+读取 config.py settings
+    ↓
+创建 FastAPI 实例
+    ↓
+注册 health.router→ GET /healthz
+注册 conversations.router → /conversations 路由组
+    ↓
+应用就绪，监听端口
+```
+
+**启动命令**:
+```bash
+uvicorn app.main:app --reload
+```
+
+**执行顺序**:
+1. uvicorn 加载 `app.main:app`（main.py 中的 app 变量）
+2. 执行 main.py 顶层代码：导入 settings、创建 FastAPI 实例、注册 routers
+3. 应用就绪，监听请求
+
+**2. 请求处理流程**（以 POST /conversations 为例）:
+
+```
+客户端 POST /conversations {"title": "test"}
+    ↓
+FastAPI 路由匹配 → conversations.router
+    ↓
+调用 create_conversation 函数
+    ↓
+Pydantic 验证请求体 (ConversationCreate)
+    ↓验证失败 → 422 ValidationError
+验证通过 → 执行函数逻辑
+    ↓
+生成 mock 数据，构建 ConversationResponse
+    ↓
+Pydantic 序列化为 JSON
+    ↓
+返回 200 + JSON 响应
+```
+
+**各层职责**:
+
+| 层 | 文件位置 | 职责 |
+|---|----------|------|
+| 路由层 | routes/ | 接收请求，调用处理函数 |
+| 验证层 | schemas/ | 验证输入，序列化输出 |
+| 业务逻辑 | routes/ | 当前直接在 route 中处理 |
+| 数据层 | models/ | 当前未使用（mock 数据） |
+
+**3. 当前 vs 未来数据流**:
+
+当前 (Day 1):
+```
+routes/ → schemas/ → mock 数据 (内存)
+```
+
+未来 (接入数据库):
+```
+routes/ → schemas/ → services/ → repositories/ → models/ → SQLite
+```
+
+---
+
+## 待补充
 
 后续疑问将持续追加到本文档。
