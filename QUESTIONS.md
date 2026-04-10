@@ -231,6 +231,55 @@ routes/ → schemas/ → services/ → repositories/ → models/ → SQLite
 
 ---
 
+### Q6: requirements.txt 中的三个核心依赖是什么作用？
+
+**日期**: 2026-04-10
+
+**解答**:
+
+`requirements.txt` 中定义了 FastAPI 应用的三个核心依赖：
+
+#### uvicorn[standard]>=0.32.0
+
+ASGI 服务器，负责运行 FastAPI 应用。
+
+- `uvicorn` 是 ASGI (Asynchronous Server Gateway Interface) 服务器实现
+- `[standard]` 额外安装 uvloop、httptools 等性能优化组件
+- FastAPI 是异步框架，需要 ASGI 服务器才能运行
+- 启动命令：`uvicorn app.main:app --reload`
+
+#### pydantic-settings>=2.6.0
+
+配置管理库，继承自 Pydantic。
+
+- 从环境变量、.env 文件自动加载配置
+- 类型安全的配置访问
+- 与 FastAPI 的依赖注入系统无缝集成
+
+```python
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    database_url: str
+    openai_api_key: str | None = None
+
+    class Config:
+        env_file = ".env"
+```
+
+#### sqlalchemy>=2.0.0
+
+Python ORM 框架，用于数据库操作。
+
+- 2.0 版本引入了现代异步 API (`AsyncSession`)
+- 支持多种数据库后端（SQLite、PostgreSQL 等）
+- 类型提示友好
+- 与 FastAPI 配合良好
+
+**依赖关系**: `pydantic-settings` 会自动安装 `pydantic`，无需显式声明。
+
+---
+
 ## 待补充
 
 后续疑问将持续追加到本文档。
