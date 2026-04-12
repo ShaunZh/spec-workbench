@@ -1,10 +1,16 @@
 "use client";
 
-export function ChatArea() {
+import { Conversation } from "@/lib/api";
+
+interface ChatAreaProps {
+  conversation: Conversation | null;
+}
+
+export function ChatArea({ conversation }: ChatAreaProps) {
   return (
     <div className="flex-1 flex flex-col bg-[#0f0f0f]">
       <div className="p-3 border-b border-[#2a2a3e] text-sm font-semibold text-[#bbb]">
-        User authentication flow
+        {conversation?.title || "No conversation selected"}
       </div>
       <div className="flex-1 flex items-center justify-center text-[#555] text-sm">
         No messages yet. Start a conversation.

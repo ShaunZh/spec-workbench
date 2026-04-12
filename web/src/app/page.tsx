@@ -1,8 +1,36 @@
+"use client";
+
+import { useState, useEffect } from "react";
 import { ConversationList } from "@/components/ConversationList";
 import { ChatArea } from "@/components/ChatArea";
 import { AnalysisPanel } from "@/components/AnalysisPanel";
+import { getConversation, Conversation } from "@/lib/api";
 
 export default function Home() {
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [selectedConversation, setSelectedConversation] =
+    useState<Conversation | null>(null);
+
+  // Fetch conversation details when selectedId changes
+  useEffect(() => {
+    if (selectedId === null) {
+      setSelectedConversation(null);
+      return;
+    }
+
+    const fetchConversation = async () => {
+      try {
+        const data = await getConversation(selectedId);
+        setSelectedConversation(data);
+      } catch (error) {
+        console.error("Failed to fetch conversation:", error);
+        setSelectedConversation(null);
+      }
+    };
+
+    fetchConversation();
+  }, [selectedId]);
+
   return (
     <main className="h-screen flex flex-col">
       {/* Top bar */}
@@ -19,8 +47,8 @@ export default function Home() {
       </div>
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
-        <ConversationList />
-        <ChatArea />
+        <ConversationList selectedId={selectedId} onSelect={setSelectedId} />
+        <ChatArea conversation={selectedConversation} />
         <AnalysisPanel />
       </div>
     </main>

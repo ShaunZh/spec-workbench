@@ -1,12 +1,23 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getConversations, createConversation, Conversation } from "@/lib/api";
+import {
+  getConversations,
+  createConversation,
+  Conversation,
+} from "@/lib/api";
 
-export function ConversationList() {
+interface ConversationListProps {
+  selectedId: number | null;
+  onSelect: (id: number) => void;
+}
+
+export function ConversationList({
+  selectedId,
+  onSelect,
+}: ConversationListProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchConversations();
@@ -17,7 +28,7 @@ export function ConversationList() {
       const data = await getConversations();
       setConversations(data);
       if (data.length > 0 && selectedId === null) {
-        setSelectedId(data[0].id);
+        onSelect(data[0].id);
       }
     } catch (error) {
       console.error("Failed to fetch conversations:", error);
@@ -30,7 +41,7 @@ export function ConversationList() {
     try {
       const newConv = await createConversation("New Chat");
       setConversations([newConv, ...conversations]);
-      setSelectedId(newConv.id);
+      onSelect(newConv.id);
     } catch (error) {
       console.error("Failed to create conversation:", error);
     }
@@ -76,7 +87,7 @@ export function ConversationList() {
                 ? "bg-[#2a2a4e] border-l-2 border-l-[#7c6ff7]"
                 : ""
             }`}
-            onClick={() => setSelectedId(conv.id)}
+            onClick={() => onSelect(conv.id)}
           >
             <div className="text-sm font-medium text-[#ddd] truncate">
               {conv.title}
