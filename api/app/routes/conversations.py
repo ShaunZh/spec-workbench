@@ -10,14 +10,14 @@ from app.schemas.conversation import ConversationCreate
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
 
-@router.get("/")
+@router.get("")
 async def list_conversations(db: Session = Depends(get_db)):
     """Return all conversations from database."""
     conversations = db.query(Conversation).all()
     return conversations
 
 
-@router.post("/")
+@router.post("")
 async def create_conversation(body: ConversationCreate, db: Session = Depends(get_db)):
     """Create a new conversation."""
     db_conv = Conversation(title=body.title, mode=body.mode or "chat")

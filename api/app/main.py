@@ -1,6 +1,7 @@
 """FastAPI application entry point."""
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.models import Conversation, Message, Artifact
@@ -9,6 +10,15 @@ from app.routes import health, conversations
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
+)
+
+# CORS middleware for frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Next.js dev server
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Create database tables on startup
