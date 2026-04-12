@@ -246,7 +246,6 @@ See `CLAUDE.md` for the detailed collaboration rules.
 ## Local Development
 
 ### Frontend
-Planned commands:
 
 ```bash
 cd web
@@ -255,15 +254,50 @@ npm run dev
 ```
 
 ### Backend
-Planned commands:
+
+#### 首次设置（创建虚拟环境并安装依赖）
 
 ```bash
 cd api
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+rm -rf .venv                      # 清理旧环境（如有问题）
+python3 -m venv .venv             # 创建虚拟环境
+source .venv/bin/activate         # 激活环境
+python -m pip install -r requirements.txt  # 安装依赖（绕过 alias）
 ```
+
+> **注意**：如果 shell 配置了 `pip` alias（指向全局 Python），请用 `python -m pip` 或 `.venv/bin/pip` 安装，确保依赖安装到虚拟环境。
+
+#### 验证安装位置
+
+```bash
+.venv/bin/pip show fastapi | grep Location
+# 应显示: api/.venv/lib/python3.x/site-packages
+```
+
+#### 日常启动
+
+每次打开新终端：
+
+```bash
+cd api
+source .venv/bin/activate
+.venv/bin/uvicorn app.main:app --reload
+```
+
+或者无需激活，直接调用：
+
+```bash
+cd api
+.venv/bin/uvicorn app.main:app --reload
+```
+
+#### 为什么需要虚拟环境
+
+| 问题 | 说明 |
+|------|------|
+| 版本冲突 | 多个项目可能需要不同版本的包 |
+| 难以复现 | 其他机器无法复现相同环境 |
+| 依赖追踪 | 无法明确项目依赖 |
 
 ---
 
@@ -283,26 +317,6 @@ uvicorn app.main:app --reload
 4. expose `/healthz`
 5. prepare placeholder routes and types
 6. review all generated code before continuing
-
----
-
-## Quick Start
-
-### Backend
-```bash
-cd api
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-### Frontend
-```bash
-cd web
-npm install
-npm run dev
-```
 
 ---
 

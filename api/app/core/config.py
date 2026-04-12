@@ -1,5 +1,7 @@
 """Application configuration settings."""
 
+from typing import Optional
+
 from pydantic_settings import BaseSettings
 
 
@@ -17,8 +19,8 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./reqpilot.db"
 
     # OpenAI (Day 1 placeholder)
-    openai_api_key: str | None = None
-    openai_base_url: str | None = None
+    openai_api_key: Optional[str] = None
+    openai_base_url: Optional[str] = None
 
     class Config:
         env_file = ".env"
