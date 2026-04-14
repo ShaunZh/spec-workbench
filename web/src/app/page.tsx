@@ -31,6 +31,18 @@ export default function Home() {
     fetchConversation();
   }, [selectedId]);
 
+  // Refresh conversation after message sent
+  const handleMessageSent = async () => {
+    if (selectedId) {
+      try {
+        const data = await getConversation(selectedId);
+        setSelectedConversation(data);
+      } catch (error) {
+        console.error("Failed to refresh conversation:", error);
+      }
+    }
+  };
+
   return (
     <main className="h-screen flex flex-col">
       {/* Top bar */}
@@ -48,7 +60,7 @@ export default function Home() {
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
         <ConversationList selectedId={selectedId} onSelect={setSelectedId} />
-        <ChatArea conversation={selectedConversation} />
+        <ChatArea conversation={selectedConversation} onMessageSent={handleMessageSent} />
         <AnalysisPanel />
       </div>
     </main>
