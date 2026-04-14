@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.models.conversation import Conversation
+from app.models.message import Message
 from app.schemas.conversation import ConversationCreate
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
@@ -36,3 +37,19 @@ async def get_conversation(conversation_id: int, db: Session = Depends(get_db)):
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
     return conversation
+
+
+@router.get("/{conversation_id}/messages")
+async def get_conversation_messages(conversation_id: int, db: Session = Depends(get_db)):
+    """Return all messages for a conversation."""
+    # Verify conversation exists
+    conversation = db.query(Conversation).filter(
+        Conversation.id == conversation_id
+    ).first()
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    messages = db.query(Message).filter(
+        Message.conversation_id == conversation_id
+    ).order_by(Message.created_at).all()
+    return messages
