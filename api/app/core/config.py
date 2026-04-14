@@ -15,12 +15,13 @@ class Settings(BaseSettings):
     app_host: str = "127.0.0.1"
     app_port: int = 8000
 
-    # Database (Day 1 placeholder)
-    database_url: str = "sqlite+aiosqlite:///./reqpilot.db"
+    # Database
+    database_url: str = "sqlite:///./reqpilot.db"
 
-    # OpenAI (Day 1 placeholder)
-    openai_api_key: Optional[str] = None
-    openai_base_url: Optional[str] = None
+    # DeepSeek LLM (OpenAI-compatible)
+    deepseek_api_key: Optional[str] = None
+    deepseek_base_url: str = "https://api.deepseek.com"
+    deepseek_model: str = "deepseek-chat"
 
     class Config:
         env_file = ".env"
