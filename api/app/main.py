@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import engine, Base
 from app.models import Conversation, Message, Artifact
-from app.routes import health, conversations
+from app.routes import health, conversations, chat
 
 app = FastAPI(
     title=settings.app_name,
@@ -27,3 +27,4 @@ Base.metadata.create_all(bind=engine)
 # Mount routers
 app.include_router(health.router)
 app.include_router(conversations.router)
+app.include_router(chat.router)
