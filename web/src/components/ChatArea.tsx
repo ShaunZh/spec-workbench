@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Conversation, Message, sendChatMessage, getConversationMessages } from "@/lib/api";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 
 interface ChatAreaProps {
   conversation: Conversation | null;
@@ -93,7 +94,7 @@ export function ChatArea({ conversation, onMessageSent }: ChatAreaProps) {
     } catch (error) {
       console.error("Failed to send message:", error);
       // Remove the temporary user message on error
-      setMessages((prev) => prev.filter((m) => m.id !== tempUserMsgId));
+      setMessages((prev) => prev.filter((m) => m.id !== (tempUserMsgId as unknown as number)));
     } finally {
       setIsLoading(false);
     }
@@ -148,7 +149,11 @@ export function ChatArea({ conversation, onMessageSent }: ChatAreaProps) {
                   : "bg-[#1a1a2e] text-[#e0e0e0] border border-[#2a2a3e]"
               }`}
             >
-              {msg.content}
+              {msg.role === "user" ? (
+                msg.content
+              ) : (
+                <MarkdownRenderer content={msg.content} />
+              )}
             </div>
           </div>
         ))}
@@ -157,7 +162,7 @@ export function ChatArea({ conversation, onMessageSent }: ChatAreaProps) {
         {streamingContent && (
           <div className="flex justify-start">
             <div className="max-w-[80%] p-3 rounded-lg text-sm bg-[#1a1a2e] text-[#e0e0e0] border border-[#2a2a3e]">
-              {streamingContent}
+              <MarkdownRenderer content={streamingContent} />
               <span className="inline-block w-2 h-4 bg-[#7c6ff7] animate-pulse ml-1" />
             </div>
           </div>
