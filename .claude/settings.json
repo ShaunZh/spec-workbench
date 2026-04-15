@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip3 list:*)",
+      "Bash(ls -la api/*.db)",
+      "Read(//Users/zhangjie/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/subagent-driven-development/**)",
+      "Bash(/Users/zhangjie/MyWorkspace/ai-agent-learning/spec-workbench/api/.venv/bin/pip install:*)",
+      "Bash(/Users/zhangjie/MyWorkspace/ai-agent-learning/spec-workbench/api/.venv/bin/python -c \"from app.core.config import settings; print\\(settings.deepseek_base_url\\)\")",
+      "Bash(.venv/bin/pip install:*)",
+      "Bash(.venv/bin/python -c \"from app.core.config import settings; print\\(settings.deepseek_base_url\\)\")",
+      "Bash(.venv/bin/python -c \"from app.services.llm import LLMService; print\\(''LLMService imported successfully''\\)\")",
+      "Bash(.venv/bin/python -c \"from app.main import app; print\\(''App imported successfully''\\)\")",
+      "Bash(.venv/bin/python -c \"from app.main import app; print\\(''Import OK''\\)\")",
+      "Bash(npm install:*)",
+      "Bash(npm list:*)",
+      "Bash(mkdir -p /Users/zhangjie/MyWorkspace/ai-agent-learning/spec-workbench/.claude/commands)",
+      "Bash(mv /Users/zhangjie/MyWorkspace/ai-agent-learning/spec-workbench/.claude/skills/claude_tutorial_companion/.claude/commands/*.md /Users/zhangjie/MyWorkspace/ai-agent-learning/spec-workbench/.claude/commands/)",
+      "Bash(rm -rf /Users/zhangjie/MyWorkspace/ai-agent-learning/spec-workbench/.claude/skills/claude_tutorial_companion/.claude)"
+    ]
+  }
+}
