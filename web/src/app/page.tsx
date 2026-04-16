@@ -59,7 +59,13 @@ export default function Home() {
       </div>
       {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
-        <ConversationList selectedId={selectedId} onSelect={setSelectedId} />
+        <ConversationList
+          selectedId={selectedId}
+          onSelect={setSelectedId}
+          onNewConversation={() => {
+            // Will be used for clearing analysis state
+          }}
+        />
         <ChatArea conversation={selectedConversation} onMessageSent={handleMessageSent} />
         <AnalysisPanel />
       </div>
