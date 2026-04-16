@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Conversation, Message, sendChatMessage, getConversationMessages } from "@/lib/api";
+import { Conversation, Message, sendChatMessage, getConversationMessages, AnalysisResult } from "@/lib/api";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 
 interface ChatAreaProps {
   conversation: Conversation | null;
   onMessageSent?: () => void;
+  onAnalysisResult?: (result: AnalysisResult) => void;
+  onAnalysisError?: (message: string) => void;
 }
 
-export function ChatArea({ conversation, onMessageSent }: ChatAreaProps) {
+export function ChatArea({ conversation, onMessageSent, onAnalysisResult, onAnalysisError }: ChatAreaProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamingContent, setStreamingContent] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -73,10 +75,20 @@ export function ChatArea({ conversation, onMessageSent }: ChatAreaProps) {
     setMessages((prev) => [...prev, tempUserMsg]);
 
     try {
-      await sendChatMessage(conversation.id, content, (chunk) => {
-        fullContentRef.current += chunk; // Accumulate in ref
-        setStreamingContent(fullContentRef.current); // Update state for display
-      });
+      await sendChatMessage(
+        conversation.id,
+        content,
+        (chunk) => {
+          fullContentRef.current += chunk;
+          setStreamingContent(fullContentRef.current);
+        },
+        (result) => {
+          onAnalysisResult?.(result);
+        },
+        (errorMsg) => {
+          onAnalysisError?.(errorMsg);
+        },
+      );
 
       // After streaming completes, add the assistant message using ref value
       const tempAssistantMsg: Message = {
