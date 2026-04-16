@@ -903,6 +903,184 @@ LangChain 的抽象层也带来代价：
 
 ---
 
+### Q13: Analysis Mode 中 System Prompt 如何强制 LLM 输出 JSON？3 层降级策略是什么？
+
+**日期**: 2026-04-16
+
+**解答**:
+
+#### System Prompt 强制 JSON 的原理
+
+通过 system prompt 中明确描述 JSON schema 并要求"必须以以下 JSON 格式返回（不要包含其他内容，不要使用 markdown 代码块标记）"，引导 LLM 输出纯 JSON。
+
+```python
+ANALYSIS_SYSTEM_PROMPT = """
+你是一个专业的需求分析专家。请根据用户输入的需求描述，生成结构化分析结果。
+必须以以下 JSON 格式返回（不要包含其他内容，不要使用 markdown 代码块标记）：
+{
+  "summary": "一段话总结需求核心内容",
+  "todos": ["待办事项1", "待办事项2"],
+  "risks": [{"title": "风险标题", "description": "风险描述"}],
+  "acceptance_criteria": ["验收标准1", "验收标准2"],
+  "open_questions": ["待确认问题1", "待确认问题2"]
+}
+"""
+```
+
+LLM 训练时见过大量类似的 schema 指令，能够理解并遵循。
+
+#### 为什么需要 3 层降级？
+
+LLM 输出不稳定，可能产生以下变体：
+
+| 情况 | LLM 输出示例 | 解析策略 |
+|------|-------------|---------|
+| 正常 | `{"summary":"...","todos":[...]}` | 直接 `json.loads()` |
+| markdown 包裹 | ` ```json\n{"summary":"..."}\n``` ` | 正则提取 code block 内容 |
+| 前缀文本 | `好的，这是分析结果：\n{"summary":"..."}` | 提取首尾 `{}` 之间的内容 |
+
+#### 3 层降级实现
+
+```python
+def parse_analysis_json(raw: str) -> Optional[dict]:
+    # 第 1 层：纯 JSON 直接解析
+    try:
+        return json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # 第 2 层：提取 markdown code block 中的 JSON
+    match = re.search(r"```json\s*\n(.*?)\n```", raw, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(1))
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # 第 3 层：提取首对 {} 之间的内容
+    start = raw.find("{")
+    end = raw.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        try:
+            return json.loads(raw[start : end + 1])
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    return None  # 全部失败
+```
+
+**Why**: 每层针对一种常见 LLM 输出变体，覆盖率高且逻辑简单。
+
+**How to apply**: 调用 `parse_analysis_json(llm_stream_content)` 即可，无需关心 LLM 实际输出格式。
+
+---
+
+### Q14: SSE 协议中如何区分 Chat 模式和 Analysis 模式的事件格式？
+
+**日期**: 2026-04-16
+
+**解答**:
+
+#### 两种 SSE 事件格式
+
+| 模式 | 事件格式 | 说明 |
+|------|---------|------|
+| **Chat** | `data: {chunk}\n\n` + `data: [DONE]\n\n` | raw chunk，向后兼容 |
+| **Analysis** | `data: {"type":"chunk","content":"..."}\n\n` | typed JSON event |
+| | `data: {"type":"analysis_result","data":{...}}\n\n` | 分析结果 |
+| | `data: {"type":"analysis_error","message":"..."}\n\n` | 错误信息 |
+| | `data: {"type":"done"}\n\n` | 结束信号 |
+
+#### 后端实现
+
+```python
+# chat.py — 根据 conversation.mode 选择格式
+if conversation_mode == "analysis":
+    # typed JSON events
+    yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+    # ... analysis_result, done ...
+else:
+    # raw chunks (backward compatible)
+    yield f"data: {chunk}\n\n"
+    yield "data: [DONE]\n\n"
+```
+
+#### 前端消费
+
+```typescript
+// api.ts — try/catch 区分两种格式
+for (const line of lines) {
+  if (line.startsWith("data: ")) {
+    const data = line.slice(6);
+    if (data === "[DONE]") return;
+
+    try {
+      const event = JSON.parse(data);
+      // typed JSON event (Analysis mode)
+      if (event.type === "chunk") onChunk(event.content);
+      else if (event.type === "analysis_result") onAnalysisResult?.(event.data);
+      else if (event.type === "analysis_error") onError?.(event.message);
+      else if (event.type === "done") return;
+    } catch {
+      // raw chunk (Chat mode) — not valid JSON
+      onChunk(data);
+    }
+  }
+}
+```
+
+**Why**: Chat 模式保持 backward-compatible raw chunk 格式（现有代码无需改动），Analysis 模式用 typed events 支持多事件类型。
+
+**How to apply**: 前端通过 `try/catch JSON.parse` 自动区分两种格式，无需额外字段标识模式。
+
+---
+
+### Q15: 为什么选择 System Prompt 而非 response_format 或 Tool Calling 来实现结构化输出？
+
+**日期**: 2026-04-16
+
+**解答**:
+
+#### 三种方案对比
+
+| 方案 | 原理 | 兼容性 | 稳定性 | 学习价值 | 本项目选择 |
+|------|------|--------|--------|---------|-----------|
+| **System Prompt** | prompt 中描述 schema，引导 LLM 输出 JSON | ✅ 最强，所有 LLM 支持 | ⚠️ 中等，需降级解析 | ✅ 最高，理解 prompt 设计本质 | ✅ |
+| **response_format** | OpenAI API 参数 `response_format: {type: "json_object"}` | ❌ 仅 OpenAI 兼容模型 | ✅ 高，强制 JSON | ⚠️ 较低，依赖框架能力 | ❌ |
+| **Tool Calling** | 定义 tool schema，LLM 调用 tool 传参 | ⚠️ 部分模型支持 | ✅ 高，结构化 | ✅ 高，但属于另一个学习目标 | 后续阶段 |
+
+#### 为什么选 System Prompt
+
+**1. 兼容性最强**
+
+项目使用 DeepSeek API（通过 OpenAI SDK 调用），DeepSeek 不完全支持 `response_format: {type: "json_object"}`。System Prompt 对所有 LLM 有效。
+
+**2. 学习价值最高**
+
+理解 prompt 如何引导 LLM 行为是 Agent 开发的核心能力。手写 System Prompt 能深入理解：
+- schema 描述方式
+- LLM 指令遵循模式
+- 输出不稳定时的降级策略
+
+**3. MVP 阶段够用**
+
+3 层降级解析覆盖了 99% 的 LLM 输出变体，效果稳定。
+
+#### 三种方案的适用场景
+
+| 场景 | 推荐方案 |
+|------|---------|
+| MVP / 多模型兼容 | System Prompt |
+| 纯 OpenAI 项目 / 稳定性要求高 | response_format |
+| 需要 LLM 主动调用外部工具 | Tool Calling |
+| 复杂多步工作流 | Tool Calling + Agent Loop |
+
+**Why**: 不同方案有不同 tradeoff，选择取决于项目约束（兼容性、学习价值、稳定性）。
+
+**How to apply**: 本项目 MVP 用 System Prompt，Tool Calling 作为下一阶段单独实现，形成对比学习。
+
+---
+
 ## 待补充
 
 后续疑问将持续追加到本文档。

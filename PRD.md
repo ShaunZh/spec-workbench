@@ -57,10 +57,10 @@
 ## 2.2 MVP 目标
 在第一阶段，仅验证以下能力：
 
-1. 支持聊天式输入与流式回复
-2. 支持“分析模式”输出固定结构结果
+1. ~~支持聊天式输入与流式回复~~ ✅ 已完成
+2. ~~支持”分析模式”输出固定结构结果~~ ✅ 已完成
 3. 支持至少一个工具调用
-4. 支持会话历史保存与查看
+4. ~~支持会话历史保存与查看~~ ✅ 已完成
 5. 支持分析结果导出为 Markdown
 
 ## 2.3 非目标
@@ -199,16 +199,29 @@ MVP 阶段暂不作为重点学习内容的包括：
 ## 6.2 分析模式
 用户输入一段需求文本、Bug 描述或反馈内容，系统生成结构化分析结果。
 
+> **状态**: ✅ MVP 已实现
+
+### 触发机制
+- 创建会话时选择模式（Chat / Analysis）
+- 分析模式会话中的每次消息发送自动触发分析流程
+
 ### 输出字段
-- `summary`
-- `todos`
-- `risks`
-- `acceptance_criteria`
-- `open_questions`
+- `summary` — 需求核心内容总结
+- `todos` — 待办事项列表
+- `risks` — 风险点（title + description）
+- `acceptance_criteria` — 验收标准
+- `open_questions` — 待确认问题
+
+### 实现方式
+- System Prompt 强制 LLM 输出 JSON
+- 3 层降级解析：纯 JSON → markdown code block → 首对 `{}` 包裹
+- SSE typed events 流式推送（chunk → analysis_result → done）
+- 分析结果双写：Message（message_type=structured）+ Artifact（持久化）
 
 ### 价值
 - 形成统一结构输出
 - 便于后续开发和测试使用
+- 分析结果可追溯、可回显
 
 ---
 
@@ -239,11 +252,13 @@ MVP 阶段暂不作为重点学习内容的包括：
 ## 6.4 会话历史
 系统支持保存和查看历史会话。
 
+> **状态**: ✅ MVP 已实现
+
 ### 功能
-- 创建会话
-- 查看会话列表
-- 查看单个会话详情
-- 查看历史分析结果
+- 创建会话（支持选择 Chat / Analysis 模式）
+- 查看会话列表（按更新时间排序）
+- 切换会话加载历史消息
+- 查看历史分析结果（Artifact 回显）
 
 ### 价值
 - 支持追溯
@@ -380,6 +395,8 @@ MVP 阶段暂不作为重点学习内容的包括：
 ## 11.1 流式输出
 AI 回复需逐步展示，避免长时间空白等待。
 
+> **状态**: ✅ 已实现（Chat 模式 raw chunk + Analysis 模式 typed events）
+
 ## 11.2 工具调用可见
 用户应能看到：
 
@@ -387,8 +404,15 @@ AI 回复需逐步展示，避免长时间空白等待。
 - 工具结果
 - 最终回复
 
+> **状态**: 待实现（Tool Calling 阶段）
+
 ## 11.3 分析结果独立展示
 结构化分析结果不能只埋在聊天文本里，必须在右侧面板单独展示。
+
+> **状态**: ✅ 已实现
+> - 实时 SSE 流式展示（`LiveAnalysisCards`）
+> - 历史数据回显（`ArtifactAnalysisCards`）
+> - 5 字段卡片：Summary / Todos / Risks / Acceptance Criteria / Open Questions
 
 ## 11.4 错误可恢复
 出现错误时，至少支持：

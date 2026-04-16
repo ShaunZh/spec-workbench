@@ -16,23 +16,26 @@ It is intentionally built through **developer-led, AI-assisted collaboration**, 
 
 ## Project Status
 
-Current stage: **MVP / Day 1**
+Current stage: **MVP / Phase 4 Complete**
 
-At this stage, the project focuses on:
+Completed:
 
 - frontend and backend project scaffolding
-- homepage layout
-- FastAPI backend skeleton
-- basic route placeholders
-- project documentation
+- three-column homepage layout (conversation list / chat area / analysis panel)
+- FastAPI backend with SQLite database
+- Conversation CRUD with SQLAlchemy ORM
+- DeepSeek API integration via OpenAI SDK
+- SSE streaming chat responses with real-time frontend rendering
+- Markdown rendering for AI responses (react-markdown)
+- **Analysis Mode** — structured LLM output (summary, todos, risks, acceptance criteria, open questions)
+- **Conversation-level mode switching** (Chat / Analysis at creation time)
+- **Artifact persistence** — analysis results saved and retrievable
+- **Typed SSE events** for analysis mode, backward-compatible raw chunks for chat mode
 
 Not implemented yet:
 
-- real LLM integration
-- streaming
-- tool calling
-- structured analysis logic
-- Markdown export
+- tool calling (`spec_score`)
+- Markdown export for analysis results
 - authentication
 - RAG
 - multi-agent workflow
@@ -112,28 +115,48 @@ Use this project to practice and understand:
 └── README.md         # Project overview
 ```
 
-### Planned frontend structure
+### Current frontend structure
 
 ```text
 web/
 └── src/
     ├── app/
+    │   ├── layout.tsx
+    │   └── page.tsx
     ├── components/
+    │   ├── ConversationList.tsx    # sidebar + mode picker
+    │   ├── ChatArea.tsx            # messages + streaming + markdown
+    │   ├── AnalysisPanel.tsx       # structured analysis cards
+    │   └── MarkdownRenderer.tsx    # dark theme markdown rendering
     ├── lib/
-    └── stores/       # only when needed
+    │   └── api.ts                  # API client + SSE handler
+    └── stores/                     # only when actually needed
 ```
 
-### Planned backend structure
+### Current backend structure
 
 ```text
 api/
 └── app/
-    ├── main.py
+    ├── main.py                     # FastAPI entrypoint
     ├── routes/
+    │   ├── health.py               # GET /healthz
+    │   ├── conversations.py        # Conversation CRUD
+    │   ├── chat.py                 # POST /chat/stream (SSE, mode-aware)
+    │   └── artifacts.py            # Artifact CRUD
     ├── schemas/
+    │   ├── chat.py                 # Chat request/response
+    │   └── artifact.py             # ArtifactCreate
     ├── models/
+    │   ├── conversation.py         # Conversation model (mode field)
+    │   ├── message.py              # Message model
+    │   └── artifact.py             # Artifact model
     ├── core/
-    └── services/     # only when needed
+    │   ├── config.py               # env settings
+    │   └── database.py             # SQLAlchemy engine + session
+    └── services/
+        ├── llm.py                  # DeepSeek LLM service + analysis prompt
+        └── analysis.py             # JSON parser with 3-tier fallback
 ```
 
 ---
@@ -191,18 +214,18 @@ Analysis result panel
 
 ## API Plan
 
-### Implement on Day 1
-- `GET /healthz`
-
-### Placeholder routes
-- `GET /conversations`
-- `POST /conversations`
-- `GET /conversations/{id}`
+### Implemented
+- `GET /healthz` — health check
+- `GET /conversations` — list all conversations
+- `POST /conversations` — create conversation (with mode: chat/analysis)
+- `GET /conversations/{id}` — get conversation details
+- `POST /chat/stream` — SSE chat endpoint (mode-aware: raw chunks for chat, typed events for analysis)
+- `GET /conversations/{id}/messages` — get conversation message history
+- `POST /artifacts` — create artifact from analysis result
+- `GET /artifacts/conversations/{conversation_id}` — get artifacts for conversation
 
 ### Planned later
-- `POST /chat/stream`
-- `POST /analysis`
-- `POST /export/markdown`
+- `POST /export/markdown` — export analysis results to Markdown
 
 ---
 
@@ -311,12 +334,18 @@ cd api
 
 ## Next Steps
 
-1. generate the Day 1 project skeleton
-2. implement the homepage layout
-3. implement FastAPI app entrypoint
-4. expose `/healthz`
-5. prepare placeholder routes and types
-6. review all generated code before continuing
+1. ~~generate the Day 1 project skeleton~~ ✅
+2. ~~implement the homepage layout~~ ✅
+3. ~~implement FastAPI app entrypoint~~ ✅
+4. ~~expose `/healthz`~~ ✅
+5. ~~prepare placeholder routes and types~~ ✅
+6. ~~review all generated code before continuing~~ ✅
+7. ~~implement database integration and CRUD~~ ✅
+8. ~~implement LLM streaming chat~~ ✅
+9. ~~implement Markdown rendering~~ ✅
+10. ~~implement Analysis Mode with structured output~~ ✅
+11. implement Tool Calling (`spec_score`)
+12. implement Markdown Export
 
 ---
 
