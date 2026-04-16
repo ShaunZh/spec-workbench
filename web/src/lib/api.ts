@@ -17,6 +17,32 @@ export interface Message {
   created_at: string;
 }
 
+export interface AnalysisResult {
+  summary: string;
+  todos: string[];
+  risks: { title: string; description: string }[];
+  acceptance_criteria: string[];
+  open_questions: string[];
+}
+
+export type SSEEvent =
+  | { type: "chunk"; content: string }
+  | { type: "analysis_result"; data: AnalysisResult }
+  | { type: "analysis_error"; message: string }
+  | { type: "done" };
+
+export interface ArtifactResponse {
+  id: number;
+  conversation_id: number;
+  summary: string | null;
+  todos_json: string | null;
+  risks_json: string | null;
+  acceptance_json: string | null;
+  questions_json: string | null;
+  score_json: string | null;
+  created_at: string;
+}
+
 export async function getConversations(): Promise<Conversation[]> {
   const res = await fetch(`${API_BASE}/conversations`);
   if (!res.ok) throw new Error("Failed to fetch conversations");
@@ -51,7 +77,9 @@ export async function getConversationMessages(id: number): Promise<Message[]> {
 export async function sendChatMessage(
   conversationId: number,
   content: string,
-  onChunk: (chunk: string) => void
+  onChunk: (chunk: string) => void,
+  onAnalysisResult?: (result: AnalysisResult) => void,
+  onError?: (message: string) => void
 ): Promise<void> {
   const res = await fetch(`${API_BASE}/chat/stream`, {
     method: "POST",
@@ -86,8 +114,30 @@ export async function sendChatMessage(
         if (data.startsWith("[ERROR]")) {
           throw new Error(data.slice(8));
         }
-        onChunk(data);
+
+        // Try parsing as typed event (analysis mode)
+        try {
+          const parsed: SSEEvent = JSON.parse(data);
+          if (parsed.type === "chunk") {
+            onChunk(parsed.content);
+          } else if (parsed.type === "analysis_result" && onAnalysisResult) {
+            onAnalysisResult(parsed.data);
+          } else if (parsed.type === "analysis_error" && onError) {
+            onError(parsed.message);
+          } else if (parsed.type === "done") {
+            return;
+          }
+        } catch {
+          // Not JSON — treat as raw chunk (chat mode)
+          onChunk(data);
+        }
       }
     }
   }
+}
+
+export async function getArtifacts(conversationId: number): Promise<ArtifactResponse[]> {
+  const res = await fetch(`${API_BASE}/artifacts/conversations/${conversationId}`);
+  if (!res.ok) return [];
+  return res.json();
 }
