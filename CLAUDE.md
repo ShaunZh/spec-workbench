@@ -92,6 +92,7 @@ If AI proposes something beyond current scope, keep the simpler option.
 - `CLAUDE.md` — AI collaboration rules (this file)
 - `README.md` — project overview and setup
 - `QUESTIONS.md` — learning questions and answers
+- `LEARNING_JOURNAL.md` — phase-by-phase development log with learning significance
 
 ### Backend folders
 - `app/main.py`
@@ -150,6 +151,38 @@ When helping with this repository:
 - optimize for learning value, not just speed
 - preserve developer control over core decisions
 - do not silently expand scope
+
+### 阶段学习日志
+
+本项目使用 `LEARNING_JOURNAL.md` 按阶段记录开发成果及学习意义。
+
+**触发条件**: 一个开发阶段完成后（有新的功能落地或重大设计完成）。
+
+**操作流程**:
+1. 在 `LEARNING_JOURNAL.md` 的顶部（`<!-- 以下为各阶段记录 -->` 注释下方）追加新阶段记录
+2. 格式要求：
+   ```markdown
+   ---
+
+   ### Phase {N}: {阶段名称}
+
+   | 字段 | 内容 |
+   |------|------|
+   | **日期** | {YYYY-MM-DD 或日期范围} |
+   | **完成功能** | {产品层面交付了什么，列要点} |
+   | **学习意义** | {对应 PRD 的哪个学习目标，学到了什么核心概念} |
+   | **关键技术点** | {涉及的技术能力和概念，列要点} |
+   | **涉及文件** | {主要改动的文件列表，带简要说明} |
+   | **设计决策** | {关键架构取舍及其原因，可选} |
+   | **经验教训** | {踩坑记录、值得复盘的点，可选} |
+   ```
+3. 新增阶段放在现有阶段的**上方**（倒序排列，最新在最上）
+4. 学习意义应明确对应 PRD 中的学习目标（学习目标 1-4）
+
+**不记录的情况**:
+- 纯重构无功能变化
+- 小修小改（拼写、样式微调）
+- 与 AI agent 学习无关的纯工程琐事
 
 ### 疑问记录流程
 
