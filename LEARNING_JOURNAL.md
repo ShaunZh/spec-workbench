@@ -39,6 +39,220 @@
 
 ---
 
+### Phase 4 架构详解
+
+#### 一、整体架构：数据流全景
+
+```
+用户输入需求文本
+       │
+       ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    前端 (Next.js)                           │
+│                                                             │
+│  ConversationList ──创建会话(选择模式)──▶ ChatArea          │
+│  (模式选择器)         mode=chat/analysis       │             │
+│                                            发送消息         │
+│                                               │             │
+└────────────────────────────────────────────────▼────────────┘
+                                               │ POST /chat/stream
+                                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    后端 (FastAPI)                           │
+│                                                             │
+│  1. 查 conversation.mode ── analysis? ──注入 System Prompt  │
+│  2. 调 LLM (DeepSeek) ── SSE 流式返回                        │
+│  3. 解析 JSON ── 3 层降级策略                                │
+│  4. 双写 ── Message + Artifact                              │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+       │
+       ▼ (typed SSE events)
+┌─────────────────────────────────────────────────────────────┐
+│                    前端接收                                  │
+│                                                             │
+│  ChatArea ── 流式 chunk → MarkdownRenderer → 实时渲染       │
+│  AnalysisPanel ── analysis_result → LiveAnalysisCards       │
+│                   (实时 SSE 展示)                            │
+│  Artifact ── DB 回显 → ArtifactAnalysisCards                │
+│       (历史数据)                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**一句话总结**：用户在分析模式会话中发消息 → 后端注入 system prompt 让 LLM 输出 JSON → 解析后流式推送前端 → 同时保存到数据库 → 右侧面板实时 + 历史展示 5 字段结构化结果。
+
+#### 二、后端实现（3 个核心层）
+
+**2.1 LLM 层 — mode-aware 路由**
+
+```python
+# api/app/services/llm.py
+
+# 常量：分析模式的 system prompt
+ANALYSIS_SYSTEM_PROMPT = """
+你是一个专业的需求分析专家...
+必须以以下 JSON 格式返回...
+{
+  "summary": "...",
+  "todos": [...],
+  "risks": [{"title": "...", "description": "..."}],
+  "acceptance_criteria": [...],
+  "open_questions": [...]
+}
+"""
+
+# 方法：根据 mode 决定是否注入 prompt
+def stream_chat_with_mode(self, messages, conversation_mode):
+    if conversation_mode == "analysis":
+        messages.insert(0, {"role": "system", "content": ANALYSIS_SYSTEM_PROMPT})
+    return self.stream_chat(messages), conversation_mode
+```
+
+**设计点**：不创建新方法，而是在原 `stream_chat` 前加一个条件层。analysis 模式多注入一个 system prompt，chat 模式原样不动。
+
+**2.2 JSON 解析层 — 3 层降级**
+
+```
+LLM 输出可能是什么格式？
+├── 正常：纯 JSON → json.loads() 成功
+├── markdown：```json\n{...}\n``` → 正则提取 → json.loads()
+└── 前缀文本："好的，分析如下：\n{...}" → 提取首尾 {} → json.loads()
+    └── 全部失败 → 返回 None → 触发 SSE error 事件
+```
+
+**为什么需要降级**：LLM 不是确定性输出器。即使 system prompt 要求"不要包含其他内容"，仍可能输出前缀、markdown 包裹、甚至多余文本。3 层策略覆盖 99% 的场景。
+
+**2.3 路由层 — SSE 双格式**
+
+```
+POST /chat/stream
+│
+├── 查询 conversation.mode
+│
+├── analysis 模式：
+│   ├── for chunk in stream:
+│   │     yield {"type": "chunk", "content": "..."}
+│   ├── 解析 JSON → 成功？
+│   │     ├── yield {"type": "analysis_result", "data": {...}}
+│   │     └── 写 Message (message_type="structured")
+│   │     └── 写 Artifact (持久化 5 字段)
+│   │     └── yield {"type": "done"}
+│   │     └── 失败？→ yield {"type": "analysis_error", "message": "..."}
+│
+└── chat 模式（向后兼容）：
+    ├── for chunk in stream:
+    │     yield f"data: {chunk}\n\n"
+    └── yield "data: [DONE]\n\n"
+```
+
+**关键设计**：同一接口，根据 mode 分支。好处是前端只需调用一个 API，后端复用 SSE 管道。
+
+#### 三、前端实现（3 个组件 + 1 个 API 层）
+
+**3.1 API 层 — SSE 事件消费者**
+
+```typescript
+// web/src/lib/api.ts — 消费 SSE：try/catch 自动区分两种格式
+try {
+  const event = JSON.parse(data);
+  // typed event (Analysis mode)
+  if (event.type === "chunk") onChunk(event.content);
+  if (event.type === "analysis_result") onAnalysisResult(event.data);
+  if (event.type === "analysis_error") onError(event.message);
+  if (event.type === "done") return;
+} catch {
+  // raw chunk (Chat mode)
+  onChunk(data);
+}
+```
+
+**巧妙之处**：Chat 模式的 raw chunk 不是合法 JSON，走 catch 分支；Analysis 模式的 typed event 是合法 JSON，走 try 分支。无需额外字段标识模式。
+
+**3.2 ConversationList — 模式选择器**
+
+替代了原来的"一键新建"，变成两步：
+
+```
+点击 "+ New Chat"
+    ↓
+显示模式选择器
+┌─────────────────────┐
+│  Choose mode:       │
+│  [ Chat ] [Analysis]│
+│  [ Cancel ]         │
+└─────────────────────┘
+    ↓
+POST /conversations {title: "New Chat", mode: "analysis"}
+```
+
+**3.3 ChatArea — 双回调**
+
+发送消息时传入两个新回调：
+- `onAnalysisResult`: 收到 analysis_result → 触发右侧面板更新
+- `onAnalysisError`: 收到 analysis_error → 显示错误 toast
+
+聊天区同时展示用户消息（紫色气泡）、AI 流式回复（Markdown 渲染 + 光标闪烁）、流式结束后追加固定 assistant message。
+
+**3.4 AnalysisPanel — 双路径渲染**
+
+右侧面板数据源有两条路径：
+
+```
+实时路径（SSE 流式）：
+  page.tsx analysisResult state → LiveAnalysisCards
+  显示 5 个卡片：Summary / Todos / Risks / Acceptance Criteria / Open Questions
+
+历史路径（DB 回显）：
+  切换会话时 → getArtifacts(conversationId) → ArtifactAnalysisCards
+  从 Artifact 表的 todos_json / risks_json 等字段反序列化展示
+```
+
+#### 四、数据存储（双写模式）
+
+```
+一次分析成功的完整数据流：
+
+LLM 返回完整 JSON
+    │
+    ├── 写 Message 表
+    │   role="assistant", content=完整JSON文本
+    │   message_type="structured"
+    │   作用：聊天历史中可见
+    │
+    └── 写 Artifact 表
+        summary = data["summary"]
+        todos_json = json.dumps(data["todos"])
+        risks_json = json.dumps(data["risks"])
+        acceptance_json = json.dumps(data["acceptance_criteria"])
+        questions_json = json.dumps(data["open_questions"])
+        作用：右侧面板独立查询展示
+```
+
+**为什么双写**：Message 表服务于聊天历史的线性展示，Artifact 表服务于结构化查询和面板展示。职责分离。
+
+#### 五、一次完整的用户旅程
+
+```
+1. 用户点击 "+ New Chat" → 选择 "Analysis" 模式
+2. 创建 conversation(mode="analysis")
+3. 用户粘贴一段需求描述："用户需要登录功能，支持微信和手机号"
+4. 前端 POST /chat/stream {content: "...", conversation_id: 1}
+5. 后端查到 mode="analysis" → 注入 ANALYSIS_SYSTEM_PROMPT → 调 DeepSeek
+6. SSE 实时推送：
+   - {"type":"chunk","content":"..."}  → 前端 MarkdownRenderer 实时渲染
+   - {"type":"analysis_result","data":{
+       summary:"用户需要...", todos:[...], risks:[...]
+     }}
+   - {"type":"done"}
+7. 前端：
+   - ChatArea 追加 assistant message
+   - AnalysisPanel 的 LiveAnalysisCards 显示 5 个卡片
+   - 后端同时写了 Message + Artifact 到数据库
+8. 用户切换会话再切回来 → AnalysisPanel 从 DB 加载 Artifact 回显
+```
+
+---
+
 <!-- 以下为各阶段记录，按时间倒序排列，最新阶段在最上方 -->
 
 ---
